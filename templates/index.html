@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VISCOM — Instagram Profile Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════
+       NAVIGATION
+  ═══════════════════════════════════════ -->
+  <nav style="position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(20,16,20,0.8);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.04);">
+    <div style="max-width:1400px;margin:0 auto;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:36px;height:36px;background:var(--gradient-fire);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;color:white;">V</div>
+        <span style="font-size:18px;font-weight:800;letter-spacing:-0.02em;">VISCOM</span>
+        <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.15em;color:rgba(245,245,245,0.35);margin-left:4px;">Analyzer</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge badge-orange">Beta</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════
+       HERO / SEARCH SECTION
+  ═══════════════════════════════════════ -->
+  <section id="search-section" style="padding:140px 32px 80px;max-width:900px;margin:0 auto;text-align:center;">
+    <div style="margin-bottom:16px;">
+      <span class="badge badge-gold" style="font-size:12px;padding:6px 16px;">🔍 Competitive Intelligence</span>
+    </div>
+    <h1 style="font-size:clamp(36px,6vw,64px);font-weight:900;letter-spacing:-0.04em;line-height:1.05;margin-bottom:20px;">
+      Analyze Any<br>
+      <span class="glow-text">Instagram Profile</span>
+    </h1>
+    <p style="font-size:18px;color:rgba(245,245,245,0.45);max-width:560px;margin:0 auto 48px;line-height:1.6;">
+      Get engagement rates, content breakdowns, hashtag intelligence, and strategic recommendations — all in seconds.
+    </p>
+
+    <!-- Search Form -->
+    <div style="max-width:600px;margin:0 auto;position:relative;">
+      <div style="display:flex;gap:12px;align-items:center;">
+        <div style="position:relative;flex:1;">
+          <span style="position:absolute;left:18px;top:50%;transform:translateY(-50%);color:rgba(245,245,245,0.3);font-size:18px;font-weight:600;">@</span>
+          <input type="text" id="username-input" class="input-glass" placeholder="username" style="padding-left:44px;"
+            onkeydown="if(event.key==='Enter')analyze()">
+        </div>
+        <button id="analyze-btn" class="btn-glow" onclick="analyze()" style="white-space:nowrap;padding:16px 28px;">
+          Analyze
+        </button>
+      </div>
+      <p style="font-size:12px;color:rgba(245,245,245,0.25);margin-top:12px;text-align:left;padding-left:4px;">
+        Enter a public Instagram username. Private profiles cannot be analyzed.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       LOADING OVERLAY
+  ═══════════════════════════════════════ -->
+  <div id="loading" class="loading-overlay" style="display:none;">
+    <div class="loader-ring"></div>
+    <div class="loading-text" id="loading-text">Scraping profile data...</div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       RESULTS DASHBOARD
+  ═══════════════════════════════════════ -->
+  <div id="results" style="display:none;max-width:1400px;margin:0 auto;padding:0 32px 80px;">
+
+    <!-- Profile Header -->
+    <div id="profile-header" class="glass-card section-animate" style="padding:32px;margin-bottom:32px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+      <!-- Filled by JS -->
+    </div>
+
+    <!-- Key Stats Row -->
+    <div id="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:32px;">
+      <!-- Filled by JS -->
+    </div>
+
+    <!-- Charts Row 1 -->
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:24px;margin-bottom:24px;">
+      <div class="glass-card section-animate stagger-2" style="padding:28px;">
+        <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(245,245,245,0.5);margin-bottom:20px;">Engagement Over Time</h3>
+        <div class="chart-container">
+          <canvas id="engagementChart"></canvas>
+        </div>
+      </div>
+      <div class="glass-card section-animate stagger-3" style="padding:28px;">
+        <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(245,245,245,0.5);margin-bottom:20px;">Content Mix</h3>
+        <div class="chart-container">
+          <canvas id="contentChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Row 2 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">
+      <div class="glass-card section-animate stagger-4" style="padding:28px;">
+        <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(245,245,245,0.5);margin-bottom:20px;">Best Day to Post</h3>
+        <div class="chart-container">
+          <canvas id="dayChart"></canvas>
+        </div>
+      </div>
+      <div class="glass-card section-animate stagger-5" style="padding:28px;">
+        <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(245,245,245,0.5);margin-bottom:20px;">Best Hour to Post</h3>
+        <div class="chart-container" style="height:250px;">
+          <canvas id="hourChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hashtags + Caption Analysis -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">
+      <div class="glass-card section-animate stagger-6" style="padding:28px;">
+        <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(245,245,245,0.5);margin-bottom:20px;">Top Hashtags</h3>
+        <div id="hashtag-cloud" style="line-height:2.2;">
+          <!-- Filled by JS -->
+        </div>
+        <div class="divider" style="margin:20px 0;"></div>
+        <h4 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(245,245,245,0.4);margin-bottom:12px;">Best Performing</h4>
+        <div id="best-hashtags">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+      <div class="glass-card section-animate stagger-7" style="padding:28px;">
+        <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(245,245,245,0.5);margin-bottom:20px;">Caption Analysis</h3>
+        <div id="caption-analysis">
+          <!-- Filled by JS -->
+        </div>
+        <div class="divider" style="margin:20px 0;"></div>
+        <h4 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(245,245,245,0.4);margin-bottom:12px;">Most Used Words</h4>
+        <div id="common-words" style="line-height:2;">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Top & Bottom Posts -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">
+      <div class="glass-card section-animate stagger-6" style="padding:28px;">
+        <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(245,245,245,0.5);margin-bottom:20px;">🏆 Top 5 Posts</h3>
+        <div id="top-posts">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+      <div class="glass-card section-animate stagger-7" style="padding:28px;">
+        <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(245,245,245,0.5);margin-bottom:20px;">📉 Bottom 5 Posts</h3>
+        <div id="bottom-posts">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="glass-card section-animate stagger-8" style="padding:28px;margin-bottom:24px;">
+      <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(245,245,245,0.5);margin-bottom:20px;">💡 Strategic Recommendations</h3>
+      <div id="recommendations" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <!-- Posting Pattern Summary -->
+    <div class="glass-card section-animate stagger-8" style="padding:28px;">
+      <h3 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(245,245,245,0.5);margin-bottom:20px;">📅 Posting Pattern Summary</h3>
+      <div id="posting-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       FOOTER
+  ═══════════════════════════════════════ -->
+  <footer style="text-align:center;padding:40px 32px;border-top:1px solid rgba(255,255,255,0.04);">
+    <p style="font-size:12px;color:rgba(245,245,245,0.2);">
+      Built by <span style="color:var(--orange-flame);font-weight:700;">VISCOM</span> — AI-Powered Creative Intelligence
+    </p>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
