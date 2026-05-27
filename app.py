@@ -5,12 +5,19 @@ Flask application — serves the dashboard and API.
 
 import json
 import os
-from flask import Flask, render_template, request, jsonify
-from lib.scraper import InstagramScraper
-from lib.analyzer import ContentAnalyzer
+import sys
+
+# Add project root to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from flask import Flask, render_template, request, jsonify, send_from_directory
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24).hex())
+
+# Import after path is set
+from lib.scraper import InstagramScraper
+from lib.analyzer import ContentAnalyzer
 
 # Cache for recent analyses
 analysis_cache = {}
@@ -21,10 +28,19 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"}), 200
+
+
 @app.route("/api/analyze", methods=["POST"])
 def analyze():
-    data = request.get_json()
-    username = data.get("username", "").strip().replace("@", "")
+    try:
+        data = request.get_json(force=True)
+    except Exception:
+        return jsonify({"error": "Invalid JSON body"}), 400
+
+    username = data.get("username", "").strip().replace("@", "").lower()
     max_posts = min(int(data.get("max_posts", 30)), 50)
 
     if not username:
@@ -40,7 +56,7 @@ def analyze():
         profile = scraper.fetch_profile(username, max_posts=max_posts)
 
         if profile is None:
-            return jsonify({"error": f"Profile '@{username}' not found or is private."}), 404
+            return jsonify({"error": f"Profile '@{username}' not found."}), 404
 
         if profile.is_private:
             return jsonify({"error": f"Profile '@{username}' is private. Only public profiles can be analyzed."}), 403
@@ -59,19 +75,19 @@ def analyze():
 
 @app.route("/api/cached/<username>")
 def cached_analysis(username):
-    result = None
     for key, val in analysis_cache.items():
         if key.startswith(username.lower() + "_"):
-            result = val
-            break
-    if result:
-        return jsonify(result)
+            return jsonify(val)
     return jsonify({"error": "No cached analysis found"}), 404
 
 
-@app.route("/health")
-def health():
-    return jsonify({"status": "ok"}), 200
+# Explicitly serve static files (helps with some hosting setups)
+@app.route("/static/<path:filename>")
+def static_files(filename):
+    return send_from_directory(
+        os.path.join(app.root_path, "static"),
+        filename
+    )
 
 
 if __name__ == "__main__":
