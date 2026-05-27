@@ -58,6 +58,18 @@ async function analyze() {
     loading.style.display = 'none';
     renderDashboard(data);
 
+    // Show demo warning if present
+    if (data._warning) {
+      const banner = document.getElementById('demo-banner');
+      const text = document.getElementById('demo-warning-text');
+      if (banner && text) {
+        text.textContent = data._warning;
+        banner.style.display = 'block';
+      }
+    } else {
+      document.getElementById('demo-banner').style.display = 'none';
+    }
+
   } catch (err) {
     clearInterval(stepInterval);
     loading.style.display = 'none';
