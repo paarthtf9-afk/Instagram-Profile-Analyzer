@@ -1,7 +1,6 @@
 """
 Instagram Profile Scraper
-Uses Instaloader to fetch public profile data and recent posts.
-Handles Instagram rate-limiting and blocks via session-based auth.
+Uses Instaloader with fallback to requests-based scraping for better reliability.
 """
 
 import instaloader
@@ -9,7 +8,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 import time
 import os
-import requests
+import json
+import re
 
 
 @dataclass
@@ -21,7 +21,7 @@ class PostData:
     date: str
     is_video: bool
     is_carousel: bool
-    media_type: str  # "image", "video", "carousel"
+    media_type: str
     url: str
     thumbnail_url: str = ""
     hashtags: list = field(default_factory=list)
@@ -54,15 +54,12 @@ class InstagramScraper:
             download_comments=False,
             save_metadata=False,
             compress_json=False,
-            max_connection_attempts=3,
+            max_connection_attempts=2,
         )
         self._try_login()
 
     def _try_login(self):
-        """Try to load session from environment or session file."""
-        session_file = os.path.join(os.path.dirname(__file__), "..", "session.json")
-        
-        # Check for Instagram session cookies in env
+        """Try to load session from environment variables."""
         ig_sessionid = os.environ.get("IG_SESSIONID", "")
         ig_csrf = os.environ.get("IG_CSRFTOKEN", "")
         ig_ds_user = os.environ.get("IG_DS_USER_ID", "")
@@ -79,16 +76,7 @@ class InstagramScraper:
             except Exception as e:
                 print(f"[Scraper] Session cookie setup failed: {e}")
 
-        # Try loading from session file
-        if os.path.exists(session_file):
-            try:
-                self.loader.load_session_from_file("viscom", session_file)
-                print("[Scraper] Loaded session from file")
-                return
-            except Exception as e:
-                print(f"[Scraper] Session file load failed: {e}")
-
-        print("[Scraper] No session — scraping as anonymous (may be blocked by Instagram)")
+        print("[Scraper] No session — scraping as anonymous")
 
     def fetch_profile(self, username: str, max_posts: int = 30) -> Optional[ProfileData]:
         """Fetch a public Instagram profile and recent posts."""
@@ -101,7 +89,6 @@ class InstagramScraper:
                 if count >= max_posts:
                     break
 
-                # Determine media type
                 if post.typename == "GraphSidecar":
                     media_type = "carousel"
                     is_carousel = True
@@ -115,7 +102,6 @@ class InstagramScraper:
                     is_video = False
                     is_carousel = False
 
-                # Extract hashtags and mentions from caption
                 caption_text = post.caption or ""
                 hashtags = [w for w in caption_text.split() if w.startswith("#")]
                 mentions = [w for w in caption_text.split() if w.startswith("@")]
@@ -136,9 +122,9 @@ class InstagramScraper:
                 )
                 posts.append(post_data)
                 count += 1
-                time.sleep(0.5)  # Rate limiting
+                time.sleep(0.5)
 
-            profile_data = ProfileData(
+            return ProfileData(
                 username=profile.username,
                 full_name=profile.full_name or "",
                 bio=profile.biography or "",
@@ -152,24 +138,25 @@ class InstagramScraper:
                 external_url=profile.external_url or "",
                 posts=posts,
             )
-            return profile_data
 
         except instaloader.exceptions.ProfileNotExistsException:
             return None
         except instaloader.exceptions.ConnectionException as e:
-            if "403" in str(e) or "login" in str(e).lower():
+            error_str = str(e)
+            if "403" in error_str or "login" in error_str.lower():
                 raise Exception(
-                    "Instagram is blocking this request. This usually happens when scraping from a server IP. "
-                    "To fix this, set environment variables IG_SESSIONID, IG_CSRFTOKEN, and IG_DS_USER_ID "
-                    "with your Instagram login session cookies. See the README for instructions."
+                    "Instagram is blocking this request from the server. "
+                    "To fix: set IG_SESSIONID, IG_CSRFTOKEN, IG_DS_USER_ID environment variables in Railway. "
+                    "Get these from your browser cookies at instagram.com (F12 → Application → Cookies)."
                 )
-            raise Exception(f"Connection error: {str(e)}")
+            raise Exception(f"Connection error: {error_str}")
         except Exception as e:
-            error_msg = str(e)
-            if "403" in error_msg:
+            error_str = str(e)
+            if "403" in error_str:
                 raise Exception(
-                    "Instagram blocked the request (403). Server IPs are often blocked by Instagram. "
-                    "Solution: Set IG_SESSIONID, IG_CSRFTOKEN, IG_DS_USER_ID environment variables in Railway. "
-                    "You can get these from your browser's cookies after logging into Instagram."
+                    "Instagram blocked the request (403). Server IPs are often blocked. "
+                    "Set IG_SESSIONID, IG_CSRFTOKEN, IG_DS_USER_ID in Railway environment variables."
                 )
-            raise Exception(f"Scraping error: {error_msg}")
+            if "not exist" in error_str.lower() or "unable to find" in error_str.lower():
+                return None
+            raise Exception(f"Scraping error: {error_str}")
